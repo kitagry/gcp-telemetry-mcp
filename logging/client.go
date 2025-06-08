@@ -1,5 +1,7 @@
 package logging
 
+//go:generate go tool mockgen -destination=mocks/mock_client.go -package=mocks github.com/kitagry/gcp-telemetry-mcp/logging LoggingClient,LoggingClientInterface
+
 import (
 	"context"
 	"fmt"
@@ -43,8 +45,8 @@ type LoggingClientInterface interface {
 	ListEntries(ctx context.Context, req ListEntriesRequest) ([]LogEntry, error)
 }
 
-// NewCloudLoggingClient creates a new CloudLoggingClient
-func NewCloudLoggingClient(projectID string) (*CloudLoggingClient, error) {
+// New creates a new CloudLoggingClient
+func New(projectID string) (*CloudLoggingClient, error) {
 	client, err := logging.NewClient(context.Background(), projectID)
 	if err != nil {
 		return nil, err
@@ -61,6 +63,13 @@ func NewCloudLoggingClient(projectID string) (*CloudLoggingClient, error) {
 			adminClient: adminClient,
 		},
 	}, nil
+}
+
+// NewWithClient creates a new CloudLoggingClient with a custom interface for testing
+func NewWithClient(client LoggingClientInterface) *CloudLoggingClient {
+	return &CloudLoggingClient{
+		client: client,
+	}
 }
 
 // WriteEntry writes a log entry to Cloud Logging

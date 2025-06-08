@@ -22,14 +22,14 @@ func main() {
 	}
 
 	// Create Cloud Logging client
-	loggingClient, err := logging.NewCloudLoggingClient(projectID)
+	loggingClient, err := logging.New(projectID)
 	if err != nil {
 		fmt.Printf("Failed to create logging client: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Create Cloud Monitoring client
-	monitoringClient, err := monitoring.NewCloudMonitoringClient(projectID)
+	monitoringClient, err := monitoring.New(projectID)
 	if err != nil {
 		fmt.Printf("Failed to create monitoring client: %v\n", err)
 		os.Exit(1)

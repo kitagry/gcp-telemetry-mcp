@@ -1,5 +1,7 @@
 package monitoring
 
+//go:generate go tool mockgen -destination=mocks/mock_client.go -package=mocks github.com/kitagry/gcp-telemetry-mcp/monitoring MonitoringClient,MonitoringClientInterface
+
 import (
 	"context"
 	"fmt"
@@ -60,10 +62,10 @@ type ListTimeSeriesRequest struct {
 
 // AggregationConfig represents aggregation configuration for time series queries
 type AggregationConfig struct {
-	AlignmentPeriod  string   `json:"alignment_period"`
-	PerSeriesAligner string   `json:"per_series_aligner"`
-	CrossSeriesReducer string `json:"cross_series_reducer,omitempty"`
-	GroupByFields    []string `json:"group_by_fields,omitempty"`
+	AlignmentPeriod    string   `json:"alignment_period"`
+	PerSeriesAligner   string   `json:"per_series_aligner"`
+	CrossSeriesReducer string   `json:"cross_series_reducer,omitempty"`
+	GroupByFields      []string `json:"group_by_fields,omitempty"`
 }
 
 // MonitoringClient defines the interface for Cloud Monitoring operations
@@ -90,8 +92,8 @@ type MonitoringClientInterface interface {
 	DeleteMetricDescriptor(ctx context.Context, metricType string) error
 }
 
-// NewCloudMonitoringClient creates a new CloudMonitoringClient
-func NewCloudMonitoringClient(projectID string) (*CloudMonitoringClient, error) {
+// New creates a new CloudMonitoringClient
+func New(projectID string) (*CloudMonitoringClient, error) {
 	metricClient, err := monitoring.NewMetricClient(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create metric client: %w", err)
@@ -110,6 +112,14 @@ func NewCloudMonitoringClient(projectID string) (*CloudMonitoringClient, error) 
 		},
 		projectID: projectID,
 	}, nil
+}
+
+// NewWithClient creates a new CloudMonitoringClient with a custom interface for testing
+func NewWithClient(client MonitoringClientInterface, projectID string) *CloudMonitoringClient {
+	return &CloudMonitoringClient{
+		client:    client,
+		projectID: projectID,
+	}
 }
 
 // CreateMetricDescriptor creates a custom metric descriptor

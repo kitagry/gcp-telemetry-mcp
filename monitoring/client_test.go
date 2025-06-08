@@ -1,63 +1,24 @@
-package monitoring
+package monitoring_test
 
 import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/kitagry/gcp-telemetry-mcp/monitoring"
+	"github.com/kitagry/gcp-telemetry-mcp/monitoring/mocks"
+	"go.uber.org/mock/gomock"
 )
 
-// mockMonitoringClient implements MonitoringClientInterface for testing
-type mockMonitoringClient struct {
-	createMetricDescriptorCalled   bool
-	writeTimeSeriesCalled          bool
-	listTimeSeriesCalled           bool
-	listMetricDescriptorsCalled    bool
-	deleteMetricDescriptorCalled   bool
-	
-	createMetricDescriptorError    error
-	writeTimeSeriesError           error
-	listTimeSeriesError            error
-	listMetricDescriptorsError     error
-	deleteMetricDescriptorError    error
-	
-	timeSeriesResponse             []TimeSeriesData
-	metricDescriptorsResponse      []MetricDescriptor
-}
-
-func (m *mockMonitoringClient) CreateMetricDescriptor(ctx context.Context, req CreateMetricRequest) error {
-	m.createMetricDescriptorCalled = true
-	return m.createMetricDescriptorError
-}
-
-func (m *mockMonitoringClient) WriteTimeSeries(ctx context.Context, req WriteTimeSeriesRequest) error {
-	m.writeTimeSeriesCalled = true
-	return m.writeTimeSeriesError
-}
-
-func (m *mockMonitoringClient) ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) ([]TimeSeriesData, error) {
-	m.listTimeSeriesCalled = true
-	return m.timeSeriesResponse, m.listTimeSeriesError
-}
-
-func (m *mockMonitoringClient) ListMetricDescriptors(ctx context.Context, filter string) ([]MetricDescriptor, error) {
-	m.listMetricDescriptorsCalled = true
-	return m.metricDescriptorsResponse, m.listMetricDescriptorsError
-}
-
-func (m *mockMonitoringClient) DeleteMetricDescriptor(ctx context.Context, metricType string) error {
-	m.deleteMetricDescriptorCalled = true
-	return m.deleteMetricDescriptorError
-}
-
 func TestCloudMonitoringClient_CreateMetricDescriptor(t *testing.T) {
-	mockClient := &mockMonitoringClient{}
-	client := &CloudMonitoringClient{
-		client:    mockClient,
-		projectID: "test-project",
-	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	req := CreateMetricRequest{
-		MetricDescriptor: MetricDescriptor{
+	mockClient := mocks.NewMockMonitoringClientInterface(ctrl)
+	client := monitoring.NewWithClient(mockClient, "test-project")
+
+	req := monitoring.CreateMetricRequest{
+		MetricDescriptor: monitoring.MetricDescriptor{
 			Type:        "custom.googleapis.com/test_metric",
 			MetricKind:  "GAUGE",
 			ValueType:   "DOUBLE",
@@ -66,30 +27,31 @@ func TestCloudMonitoringClient_CreateMetricDescriptor(t *testing.T) {
 		},
 	}
 
-	err := client.CreateMetricDescriptor(context.Background(), req)
+	// Set expectation for CreateMetricDescriptor call
+	mockClient.EXPECT().
+		CreateMetricDescriptor(gomock.Any(), req).
+		Return(nil).
+		Times(1)
 
+	err := client.CreateMetricDescriptor(context.Background(), req)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
-	}
-
-	if !mockClient.createMetricDescriptorCalled {
-		t.Error("Expected CreateMetricDescriptor to be called")
 	}
 }
 
 func TestCloudMonitoringClient_WriteTimeSeries(t *testing.T) {
-	mockClient := &mockMonitoringClient{}
-	client := &CloudMonitoringClient{
-		client:    mockClient,
-		projectID: "test-project",
-	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	req := WriteTimeSeriesRequest{
-		TimeSeries: []TimeSeriesData{
+	mockClient := mocks.NewMockMonitoringClientInterface(ctrl)
+	client := monitoring.NewWithClient(mockClient, "test-project")
+
+	req := monitoring.WriteTimeSeriesRequest{
+		TimeSeries: []monitoring.TimeSeriesData{
 			{
 				MetricType:   "custom.googleapis.com/test_metric",
 				ResourceType: "global",
-				Values: []MetricValue{
+				Values: []monitoring.MetricValue{
 					{
 						Value:     42.0,
 						Timestamp: time.Now(),
@@ -99,23 +61,27 @@ func TestCloudMonitoringClient_WriteTimeSeries(t *testing.T) {
 		},
 	}
 
-	err := client.WriteTimeSeries(context.Background(), req)
+	// Set expectation for WriteTimeSeries call
+	mockClient.EXPECT().
+		WriteTimeSeries(gomock.Any(), req).
+		Return(nil).
+		Times(1)
 
+	err := client.WriteTimeSeries(context.Background(), req)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
-	}
-
-	if !mockClient.writeTimeSeriesCalled {
-		t.Error("Expected WriteTimeSeries to be called")
 	}
 }
 
 func TestCloudMonitoringClient_ListTimeSeries(t *testing.T) {
-	expectedTimeSeries := []TimeSeriesData{
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	expectedTimeSeries := []monitoring.TimeSeriesData{
 		{
 			MetricType:   "custom.googleapis.com/test_metric",
 			ResourceType: "global",
-			Values: []MetricValue{
+			Values: []monitoring.MetricValue{
 				{
 					Value:     42.0,
 					Timestamp: time.Now(),
@@ -124,28 +90,24 @@ func TestCloudMonitoringClient_ListTimeSeries(t *testing.T) {
 		},
 	}
 
-	mockClient := &mockMonitoringClient{
-		timeSeriesResponse: expectedTimeSeries,
-	}
-	client := &CloudMonitoringClient{
-		client:    mockClient,
-		projectID: "test-project",
-	}
+	mockClient := mocks.NewMockMonitoringClientInterface(ctrl)
+	client := monitoring.NewWithClient(mockClient, "test-project")
 
-	req := ListTimeSeriesRequest{
+	req := monitoring.ListTimeSeriesRequest{
 		Filter: "metric.type=\"custom.googleapis.com/test_metric\"",
 	}
 	req.Interval.StartTime = time.Now().Add(-1 * time.Hour)
 	req.Interval.EndTime = time.Now()
 
-	result, err := client.ListTimeSeries(context.Background(), req)
+	// Set expectation for ListTimeSeries call
+	mockClient.EXPECT().
+		ListTimeSeries(gomock.Any(), req).
+		Return(expectedTimeSeries, nil).
+		Times(1)
 
+	result, err := client.ListTimeSeries(context.Background(), req)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
-	}
-
-	if !mockClient.listTimeSeriesCalled {
-		t.Error("Expected ListTimeSeries to be called")
 	}
 
 	if len(result) != 1 {
@@ -158,7 +120,10 @@ func TestCloudMonitoringClient_ListTimeSeries(t *testing.T) {
 }
 
 func TestCloudMonitoringClient_ListMetricDescriptors(t *testing.T) {
-	expectedDescriptors := []MetricDescriptor{
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	expectedDescriptors := []monitoring.MetricDescriptor{
 		{
 			Type:        "custom.googleapis.com/test_metric",
 			MetricKind:  "GAUGE",
@@ -168,22 +133,18 @@ func TestCloudMonitoringClient_ListMetricDescriptors(t *testing.T) {
 		},
 	}
 
-	mockClient := &mockMonitoringClient{
-		metricDescriptorsResponse: expectedDescriptors,
-	}
-	client := &CloudMonitoringClient{
-		client:    mockClient,
-		projectID: "test-project",
-	}
+	mockClient := mocks.NewMockMonitoringClientInterface(ctrl)
+	client := monitoring.NewWithClient(mockClient, "test-project")
+
+	// Set expectation for ListMetricDescriptors call
+	mockClient.EXPECT().
+		ListMetricDescriptors(gomock.Any(), "").
+		Return(expectedDescriptors, nil).
+		Times(1)
 
 	result, err := client.ListMetricDescriptors(context.Background(), "")
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
-	}
-
-	if !mockClient.listMetricDescriptorsCalled {
-		t.Error("Expected ListMetricDescriptors to be called")
 	}
 
 	if len(result) != 1 {
@@ -196,19 +157,21 @@ func TestCloudMonitoringClient_ListMetricDescriptors(t *testing.T) {
 }
 
 func TestCloudMonitoringClient_DeleteMetricDescriptor(t *testing.T) {
-	mockClient := &mockMonitoringClient{}
-	client := &CloudMonitoringClient{
-		client:    mockClient,
-		projectID: "test-project",
-	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mocks.NewMockMonitoringClientInterface(ctrl)
+	client := monitoring.NewWithClient(mockClient, "test-project")
+
+	// Set expectation for DeleteMetricDescriptor call
+	mockClient.EXPECT().
+		DeleteMetricDescriptor(gomock.Any(), "custom.googleapis.com/test_metric").
+		Return(nil).
+		Times(1)
 
 	err := client.DeleteMetricDescriptor(context.Background(), "custom.googleapis.com/test_metric")
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
-
-	if !mockClient.deleteMetricDescriptorCalled {
-		t.Error("Expected DeleteMetricDescriptor to be called")
-	}
 }
+
