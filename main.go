@@ -9,6 +9,7 @@ import (
 
 	"github.com/kitagry/gcp-telemetry-mcp/logging"
 	"github.com/kitagry/gcp-telemetry-mcp/monitoring"
+	"github.com/kitagry/gcp-telemetry-mcp/profiler"
 	"github.com/kitagry/gcp-telemetry-mcp/trace"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -40,6 +41,13 @@ func main() {
 	traceClient, err := trace.New(projectID)
 	if err != nil {
 		fmt.Printf("Failed to create trace client: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create Cloud Profiler client
+	profilerClient, err := profiler.New(projectID)
+	if err != nil {
+		fmt.Printf("Failed to create profiler client: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -229,6 +237,77 @@ func main() {
 		),
 	)
 
+	// Add create_profile tool
+	createProfileTool := mcp.NewTool("create_profile",
+		mcp.WithDescription("Create a new profile in Cloud Profiler"),
+		mcp.WithString("target",
+			mcp.Required(),
+			mcp.Description("Target deployment name"),
+		),
+		mcp.WithString("profile_type",
+			mcp.Required(),
+			mcp.Description("Profile type: CPU, HEAP, THREADS, CONTENTION, or WALL"),
+		),
+		mcp.WithString("duration",
+			mcp.Description("Profile duration (e.g., '60s', '5m', defaults to '60s')"),
+		),
+		mcp.WithObject("labels",
+			mcp.Description("Optional labels for the profile"),
+		),
+	)
+
+	// Add create_offline_profile tool
+	createOfflineProfileTool := mcp.NewTool("create_offline_profile",
+		mcp.WithDescription("Create an offline profile in Cloud Profiler"),
+		mcp.WithString("target",
+			mcp.Required(),
+			mcp.Description("Target deployment name"),
+		),
+		mcp.WithString("profile_type",
+			mcp.Required(),
+			mcp.Description("Profile type: CPU, HEAP, THREADS, CONTENTION, or WALL"),
+		),
+		mcp.WithString("profile_data",
+			mcp.Required(),
+			mcp.Description("Base64-encoded profile data"),
+		),
+		mcp.WithString("duration",
+			mcp.Description("Profile duration (e.g., '60s', '5m')"),
+		),
+		mcp.WithObject("labels",
+			mcp.Description("Optional labels for the profile"),
+		),
+	)
+
+	// Add update_profile tool
+	updateProfileTool := mcp.NewTool("update_profile",
+		mcp.WithDescription("Update a profile in Cloud Profiler"),
+		mcp.WithString("profile_name",
+			mcp.Required(),
+			mcp.Description("Profile name to update"),
+		),
+		mcp.WithString("profile_data",
+			mcp.Description("Updated base64-encoded profile data"),
+		),
+		mcp.WithObject("labels",
+			mcp.Description("Updated labels for the profile"),
+		),
+		mcp.WithString("update_mask",
+			mcp.Description("Fields to update (e.g., 'labels,profile_bytes')"),
+		),
+	)
+
+	// Add list_profiles tool
+	listProfilesTool := mcp.NewTool("list_profiles",
+		mcp.WithDescription("List profiles from Cloud Profiler"),
+		mcp.WithNumber("page_size",
+			mcp.Description("Maximum number of profiles to return (default: 100)"),
+		),
+		mcp.WithString("page_token",
+			mcp.Description("Page token for pagination"),
+		),
+	)
+
 	// Add tool handlers
 	s.AddTool(writeLogTool, createWriteLogHandler(loggingClient))
 	s.AddTool(listLogsTool, createListLogsHandler(loggingClient))
@@ -241,6 +320,10 @@ func main() {
 	s.AddTool(listTracesTool, createListTracesHandler(traceClient))
 	s.AddTool(getTraceTool, createGetTraceHandler(traceClient))
 	s.AddTool(patchTracesTool, createPatchTracesHandler(traceClient))
+	s.AddTool(createProfileTool, createProfileHandler(profilerClient))
+	s.AddTool(createOfflineProfileTool, createOfflineProfileHandler(profilerClient))
+	s.AddTool(updateProfileTool, updateProfileHandler(profilerClient))
+	s.AddTool(listProfilesTool, listProfilesHandler(profilerClient))
 
 	// Start the stdio server
 	if err := server.ServeStdio(s); err != nil {
@@ -794,5 +877,233 @@ func createPatchTracesHandler(client trace.TraceClient) func(context.Context, mc
 		}
 
 		return mcp.NewToolResultText("Trace spans updated successfully"), nil
+	}
+}
+
+// createProfileHandler creates a handler for creating profiles
+func createProfileHandler(client profiler.ProfilerClient) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		target, err := request.RequireString("target")
+		if err != nil {
+			return mcp.NewToolResultError("target is required"), nil
+		}
+
+		profileTypeStr, err := request.RequireString("profile_type")
+		if err != nil {
+			return mcp.NewToolResultError("profile_type is required"), nil
+		}
+
+		args := request.GetArguments()
+		duration := "60s" // default
+		if durationArg, exists := args["duration"]; exists {
+			if d, ok := durationArg.(string); ok && d != "" {
+				duration = d
+			}
+		}
+
+		// Parse labels
+		var labels map[string]string
+		if labelsArg, exists := args["labels"]; exists {
+			if labelsObj, ok := labelsArg.(map[string]any); ok {
+				labels = make(map[string]string)
+				for k, v := range labelsObj {
+					if str, ok := v.(string); ok {
+						labels[k] = str
+					}
+				}
+			}
+		}
+
+		req := profiler.CreateProfileRequest{
+			ProjectID: os.Getenv("GOOGLE_CLOUD_PROJECT"),
+			Deployment: &profiler.Deployment{
+				ProjectID: os.Getenv("GOOGLE_CLOUD_PROJECT"),
+				Target:    target,
+				Labels:    labels,
+			},
+			ProfileType: []profiler.ProfileType{profiler.ProfileType(profileTypeStr)},
+			Duration:    duration,
+			Labels:      labels,
+		}
+
+		profile, err := client.CreateProfile(ctx, req)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to create profile: %v", err)), nil
+		}
+
+		// Convert profile to JSON for response
+		profileJSON, err := json.MarshalIndent(profile, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal profile: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(string(profileJSON)), nil
+	}
+}
+
+// createOfflineProfileHandler creates a handler for creating offline profiles
+func createOfflineProfileHandler(client profiler.ProfilerClient) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		target, err := request.RequireString("target")
+		if err != nil {
+			return mcp.NewToolResultError("target is required"), nil
+		}
+
+		profileTypeStr, err := request.RequireString("profile_type")
+		if err != nil {
+			return mcp.NewToolResultError("profile_type is required"), nil
+		}
+
+		profileData, err := request.RequireString("profile_data")
+		if err != nil {
+			return mcp.NewToolResultError("profile_data is required"), nil
+		}
+
+		args := request.GetArguments()
+		duration := "60s" // default
+		if durationArg, exists := args["duration"]; exists {
+			if d, ok := durationArg.(string); ok && d != "" {
+				duration = d
+			}
+		}
+
+		// Parse labels
+		var labels map[string]string
+		if labelsArg, exists := args["labels"]; exists {
+			if labelsObj, ok := labelsArg.(map[string]any); ok {
+				labels = make(map[string]string)
+				for k, v := range labelsObj {
+					if str, ok := v.(string); ok {
+						labels[k] = str
+					}
+				}
+			}
+		}
+
+		req := profiler.CreateOfflineProfileRequest{
+			ProjectID: os.Getenv("GOOGLE_CLOUD_PROJECT"),
+			Profile: &profiler.Profile{
+				ProfileType:  profiler.ProfileType(profileTypeStr),
+				Duration:     duration,
+				Labels:       labels,
+				ProfileBytes: profileData,
+				Deployment: &profiler.Deployment{
+					ProjectID: os.Getenv("GOOGLE_CLOUD_PROJECT"),
+					Target:    target,
+					Labels:    labels,
+				},
+			},
+		}
+
+		profile, err := client.CreateOfflineProfile(ctx, req)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to create offline profile: %v", err)), nil
+		}
+
+		// Convert profile to JSON for response
+		profileJSON, err := json.MarshalIndent(profile, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal profile: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(string(profileJSON)), nil
+	}
+}
+
+// updateProfileHandler creates a handler for updating profiles
+func updateProfileHandler(client profiler.ProfilerClient) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		profileName, err := request.RequireString("profile_name")
+		if err != nil {
+			return mcp.NewToolResultError("profile_name is required"), nil
+		}
+
+		args := request.GetArguments()
+		var profileData string
+		if profileDataArg, exists := args["profile_data"]; exists {
+			if pd, ok := profileDataArg.(string); ok {
+				profileData = pd
+			}
+		}
+
+		var updateMask string
+		if updateMaskArg, exists := args["update_mask"]; exists {
+			if um, ok := updateMaskArg.(string); ok {
+				updateMask = um
+			}
+		}
+
+		// Parse labels
+		var labels map[string]string
+		if labelsArg, exists := args["labels"]; exists {
+			if labelsObj, ok := labelsArg.(map[string]any); ok {
+				labels = make(map[string]string)
+				for k, v := range labelsObj {
+					if str, ok := v.(string); ok {
+						labels[k] = str
+					}
+				}
+			}
+		}
+
+		req := profiler.UpdateProfileRequest{
+			Profile: &profiler.Profile{
+				Name:   profileName,
+				Labels: labels,
+			},
+			ProfileBytes: profileData,
+			UpdateMask:   updateMask,
+		}
+
+		profile, err := client.UpdateProfile(ctx, req)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to update profile: %v", err)), nil
+		}
+
+		// Convert profile to JSON for response
+		profileJSON, err := json.MarshalIndent(profile, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal profile: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(string(profileJSON)), nil
+	}
+}
+
+// listProfilesHandler creates a handler for listing profiles
+func listProfilesHandler(client profiler.ProfilerClient) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := request.GetArguments()
+		req := profiler.ListProfilesRequest{
+			ProjectID: os.Getenv("GOOGLE_CLOUD_PROJECT"),
+			PageSize:  100, // default
+		}
+
+		// Parse optional page_size parameter
+		if pageSizeArg, exists := args["page_size"]; exists {
+			if pageSize, ok := pageSizeArg.(float64); ok && pageSize > 0 {
+				req.PageSize = int64(pageSize)
+			}
+		}
+
+		// Parse optional page_token parameter
+		if pageTokenArg, exists := args["page_token"]; exists {
+			if pageToken, ok := pageTokenArg.(string); ok && pageToken != "" {
+				req.PageToken = pageToken
+			}
+		}
+
+		profiles, err := client.ListProfiles(ctx, req)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to list profiles: %v", err)), nil
+		}
+
+		// Convert profiles to JSON for response
+		profilesJSON, err := json.MarshalIndent(profiles, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal profiles: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(string(profilesJSON)), nil
 	}
 }

@@ -27,8 +27,12 @@ A Model Context Protocol (MCP) server for Google Cloud Platform telemetry servic
 - ✅ Update/patch trace spans with new data
 - ✅ Support for distributed trace analysis
 
-### Planned Features
-- 🔄 Cloud Profiler
+### Cloud Profiler
+- ✅ Create new profiling sessions for applications
+- ✅ Create offline profiles with existing profiling data
+- ✅ Update profile metadata and data
+- ✅ List profiles with pagination
+- ✅ Support for multiple profile types (CPU, HEAP, THREADS, CONTENTION, WALL)
 
 ## Prerequisites
 
@@ -322,6 +326,95 @@ Update trace spans in Cloud Trace.
 }
 ```
 
+## Cloud Profiler Tools
+
+#### `create_profile`
+
+Create a new profile in Cloud Profiler.
+
+**Parameters:**
+- `target` (string, required): Target deployment name
+- `profile_type` (string, required): Profile type (CPU, HEAP, THREADS, CONTENTION, or WALL)
+- `duration` (string, optional): Profile duration (e.g., '60s', '5m', defaults to '60s')
+- `labels` (object, optional): Optional labels for the profile
+
+**Example:**
+```json
+{
+  "target": "my-app-v1",
+  "profile_type": "CPU",
+  "duration": "60s",
+  "labels": {
+    "service": "web-server",
+    "version": "v1.2.0"
+  }
+}
+```
+
+#### `create_offline_profile`
+
+Create an offline profile in Cloud Profiler with existing profiling data.
+
+**Parameters:**
+- `target` (string, required): Target deployment name
+- `profile_type` (string, required): Profile type (CPU, HEAP, THREADS, CONTENTION, or WALL)
+- `profile_data` (string, required): Base64-encoded profile data
+- `duration` (string, optional): Profile duration (e.g., '60s', '5m')
+- `labels` (object, optional): Optional labels for the profile
+
+**Example:**
+```json
+{
+  "target": "my-app-v1",
+  "profile_type": "HEAP",
+  "profile_data": "base64encodedprofiledata==",
+  "duration": "30s",
+  "labels": {
+    "service": "api-server",
+    "environment": "production"
+  }
+}
+```
+
+#### `update_profile`
+
+Update a profile in Cloud Profiler.
+
+**Parameters:**
+- `profile_name` (string, required): Profile name to update
+- `profile_data` (string, optional): Updated base64-encoded profile data
+- `labels` (object, optional): Updated labels for the profile
+- `update_mask` (string, optional): Fields to update (e.g., 'labels,profile_bytes')
+
+**Example:**
+```json
+{
+  "profile_name": "projects/my-project/profiles/12345",
+  "profile_data": "newbase64encodeddata==",
+  "labels": {
+    "service": "updated-service",
+    "version": "v1.3.0"
+  },
+  "update_mask": "labels,profile_bytes"
+}
+```
+
+#### `list_profiles`
+
+List profiles from Cloud Profiler.
+
+**Parameters:**
+- `page_size` (number, optional): Maximum number of profiles to return (default: 100)
+- `page_token` (string, optional): Page token for pagination
+
+**Example:**
+```json
+{
+  "page_size": 50,
+  "page_token": "next_page_token_here"
+}
+```
+
 ## Development
 
 ### Running Tests
@@ -344,6 +437,9 @@ go test ./...
 ├── trace/
 │   ├── client.go        # Cloud Trace client implementation
 │   └── client_test.go   # Tests for trace client
+├── profiler/
+│   ├── client.go        # Cloud Profiler client implementation
+│   └── client_test.go   # Tests for profiler client
 ├── go.mod               # Go module definition
 ├── go.sum               # Go dependency checksums
 └── README.md           # This file
@@ -362,6 +458,8 @@ The server provides detailed error messages for common issues:
 - Metric descriptor creation/deletion failures
 - Cloud Trace API errors
 - Trace retrieval and span update failures
+- Cloud Profiler API errors
+- Profile creation and update failures
 
 ## Contributing
 
@@ -382,3 +480,4 @@ For issues and questions:
 - Check Google Cloud Logging documentation for logging-specific questions
 - Check Google Cloud Monitoring documentation for monitoring-specific questions
 - Check Google Cloud Trace documentation for trace-specific questions
+- Check Google Cloud Profiler documentation for profiler-specific questions
