@@ -70,21 +70,21 @@ type AggregationConfig struct {
 
 // ListAvailableMetricsRequest represents a request to list available metrics
 type ListAvailableMetricsRequest struct {
-	Filter     string `json:"filter,omitempty"`
-	PageSize   int    `json:"page_size,omitempty"`
-	PageToken  string `json:"page_token,omitempty"`
+	Filter    string `json:"filter,omitempty"`
+	PageSize  int    `json:"page_size,omitempty"`
+	PageToken string `json:"page_token,omitempty"`
 }
 
 // AvailableMetric represents an available metric in Cloud Monitoring
 type AvailableMetric struct {
-	Type         string            `json:"type"`
-	DisplayName  string            `json:"display_name"`
-	Description  string            `json:"description"`
-	MetricKind   string            `json:"metric_kind"`
-	ValueType    string            `json:"value_type"`
-	Unit         string            `json:"unit,omitempty"`
-	Labels       []MetricLabel     `json:"labels,omitempty"`
-	LaunchStage  string            `json:"launch_stage,omitempty"`
+	Type        string        `json:"type"`
+	DisplayName string        `json:"display_name"`
+	Description string        `json:"description"`
+	MetricKind  string        `json:"metric_kind"`
+	ValueType   string        `json:"value_type"`
+	Unit        string        `json:"unit,omitempty"`
+	Labels      []MetricLabel `json:"labels,omitempty"`
+	LaunchStage string        `json:"launch_stage,omitempty"`
 }
 
 // MetricLabel represents a label for a metric
@@ -499,8 +499,8 @@ func (r *realMonitoringClient) ListAvailableMetrics(ctx context.Context, req Lis
 		}
 
 		var launchStage string
-		if md.Metadata != nil {
-			launchStage = md.Metadata.LaunchStage.String()
+		if md.LaunchStage != 0 {
+			launchStage = md.LaunchStage.String()
 		}
 
 		result = append(result, AvailableMetric{

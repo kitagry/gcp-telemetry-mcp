@@ -4,6 +4,7 @@ package logging
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -89,9 +90,14 @@ type realLoggingClient struct {
 }
 
 // WriteEntry implements LoggingClientInterface for the real client
-func (r *realLoggingClient) WriteEntry(ctx context.Context, logName string, entry LogEntry) error {
+func (r *realLoggingClient) WriteEntry(ctx context.Context, logName string, entry LogEntry) (err error) {
 	logger := r.client.Logger(logName)
-	defer logger.Flush()
+	defer func() {
+		flushErr := logger.Flush()
+		if flushErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to flush logger: %w", flushErr))
+		}
+	}()
 
 	// Convert severity string to logging.Severity
 	var severity logging.Severity

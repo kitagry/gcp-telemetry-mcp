@@ -1,0 +1,79 @@
+project_name: gcp-telemetry-mcp
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - main: .
+    id: gcp-telemetry-mcp
+    binary: gcp-telemetry-mcp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^refactor:'
+      - '^style:'
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: kitagry
+    name: gcp-telemetry-mcp
+  name_template: "Release {{.Tag}}"
+  draft: false
+  prerelease: auto
+
+brews:
+  - repository:
+      owner: kitagry
+      name: homebrew-tap
+    folder: Formula
+    homepage: "https://github.com/kitagry/gcp-telemetry-mcp"
+    description: "A Model Context Protocol (MCP) server for Google Cloud Platform telemetry services"
+    license: "MIT"
+    test: |
+      system "#{bin}/gcp-telemetry-mcp", "--version"

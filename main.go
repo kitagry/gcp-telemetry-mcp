@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"time"
@@ -15,7 +16,21 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
+	showVersion := flag.Bool("version", false, "show version information")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("gcp-telemetry-mcp %s (commit: %s, built: %s)\n", version, commit, date)
+		return
+	}
+
 	// Get project ID from environment variable
 	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	if projectID == "" {
@@ -54,7 +69,7 @@ func main() {
 	// Create a new MCP server
 	s := server.NewMCPServer(
 		"GCP Telemetry MCP",
-		"0.1.0",
+		version,
 		server.WithToolCapabilities(true),
 	)
 

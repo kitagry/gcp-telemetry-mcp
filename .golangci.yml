@@ -1,0 +1,46 @@
+version: "2"
+run:
+  tests: true
+linters:
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - dupl
+          - goconst
+          - lll
+          - mnd
+        path: _test\.go
+      - linters:
+          - deadcode
+          - structcheck
+          - unused
+          - varcheck
+        path: mocks/
+      - linters:
+          - staticcheck
+        text: 'SA9003:'
+      - linters:
+          - lll
+        source: '^//go:generate '
+      - path: (.+)\.go$
+        text: declaration of "(err|ctx)" shadows declaration at
+      - path: (.+)\.go$
+        text: package comment should be of the form
+      - path: (.+)\.go$
+        text: 'ST1000: at least one file in a package should have a package comment'
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
