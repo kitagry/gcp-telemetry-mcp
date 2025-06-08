@@ -175,3 +175,58 @@ func TestCloudMonitoringClient_DeleteMetricDescriptor(t *testing.T) {
 	}
 }
 
+func TestCloudMonitoringClient_ListAvailableMetrics(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	expectedMetrics := []monitoring.AvailableMetric{
+		{
+			Type:        "compute.googleapis.com/instance/cpu/usage",
+			DisplayName: "CPU Usage",
+			Description: "CPU usage of the instance",
+			MetricKind:  "GAUGE",
+			ValueType:   "DOUBLE",
+			Unit:        "1",
+			Labels: []monitoring.MetricLabel{
+				{
+					Key:         "instance_name",
+					ValueType:   "STRING",
+					Description: "The name of the instance",
+				},
+			},
+			LaunchStage: "GA",
+		},
+	}
+
+	mockClient := mocks.NewMockMonitoringClientInterface(ctrl)
+	client := monitoring.NewWithClient(mockClient, "test-project")
+
+	req := monitoring.ListAvailableMetricsRequest{
+		Filter:   "metric.type=starts_with(\"compute.googleapis.com/\")",
+		PageSize: 50,
+	}
+
+	// Set expectation for ListAvailableMetrics call
+	mockClient.EXPECT().
+		ListAvailableMetrics(gomock.Any(), req).
+		Return(expectedMetrics, nil).
+		Times(1)
+
+	result, err := client.ListAvailableMetrics(context.Background(), req)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if len(result) != 1 {
+		t.Errorf("Expected 1 available metric, got %d", len(result))
+	}
+
+	if result[0].Type != expectedMetrics[0].Type {
+		t.Errorf("Expected metric type %s, got %s", expectedMetrics[0].Type, result[0].Type)
+	}
+
+	if result[0].MetricKind != "GAUGE" {
+		t.Errorf("Expected metric kind GAUGE, got %s", result[0].MetricKind)
+	}
+}
+

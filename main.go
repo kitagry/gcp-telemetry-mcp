@@ -160,6 +160,20 @@ func main() {
 		),
 	)
 
+	// Add list_available_metrics tool
+	listAvailableMetricsTool := mcp.NewTool("list_available_metrics",
+		mcp.WithDescription("List available metrics in Cloud Monitoring"),
+		mcp.WithString("filter",
+			mcp.Description("Filter expression for metrics (e.g., 'metric.type=starts_with(\"compute.googleapis.com/\")')"),
+		),
+		mcp.WithNumber("page_size",
+			mcp.Description("Maximum number of metrics to return (default: 100)"),
+		),
+		mcp.WithString("page_token",
+			mcp.Description("Page token for pagination"),
+		),
+	)
+
 	// Add tool handlers
 	s.AddTool(writeLogTool, createWriteLogHandler(loggingClient))
 	s.AddTool(listLogsTool, createListLogsHandler(loggingClient))
@@ -168,6 +182,7 @@ func main() {
 	s.AddTool(listTimeSeresTool, createListTimeSeriesHandler(monitoringClient))
 	s.AddTool(listMetricDescriptorsTool, createListMetricDescriptorsHandler(monitoringClient))
 	s.AddTool(deleteMetricTool, createDeleteMetricDescriptorHandler(monitoringClient))
+	s.AddTool(listAvailableMetricsTool, createListAvailableMetricsHandler(monitoringClient))
 
 	// Start the stdio server
 	if err := server.ServeStdio(s); err != nil {
@@ -495,5 +510,49 @@ func createDeleteMetricDescriptorHandler(client monitoring.MonitoringClient) fun
 		}
 
 		return mcp.NewToolResultText("Metric descriptor deleted successfully"), nil
+	}
+}
+
+// createListAvailableMetricsHandler creates a handler for listing available metrics
+func createListAvailableMetricsHandler(client monitoring.MonitoringClient) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := request.GetArguments()
+		req := monitoring.ListAvailableMetricsRequest{
+			PageSize: 100, // default
+		}
+
+		// Parse optional filter parameter
+		if filterArg, exists := args["filter"]; exists {
+			if filter, ok := filterArg.(string); ok && filter != "" {
+				req.Filter = filter
+			}
+		}
+
+		// Parse optional page_size parameter
+		if pageSizeArg, exists := args["page_size"]; exists {
+			if pageSize, ok := pageSizeArg.(float64); ok && pageSize > 0 {
+				req.PageSize = int(pageSize)
+			}
+		}
+
+		// Parse optional page_token parameter
+		if pageTokenArg, exists := args["page_token"]; exists {
+			if pageToken, ok := pageTokenArg.(string); ok && pageToken != "" {
+				req.PageToken = pageToken
+			}
+		}
+
+		metrics, err := client.ListAvailableMetrics(ctx, req)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to list available metrics: %v", err)), nil
+		}
+
+		// Convert metrics to JSON for response
+		metricsJSON, err := json.MarshalIndent(metrics, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal available metrics: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(string(metricsJSON)), nil
 	}
 }

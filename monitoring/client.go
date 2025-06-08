@@ -68,6 +68,32 @@ type AggregationConfig struct {
 	GroupByFields      []string `json:"group_by_fields,omitempty"`
 }
 
+// ListAvailableMetricsRequest represents a request to list available metrics
+type ListAvailableMetricsRequest struct {
+	Filter     string `json:"filter,omitempty"`
+	PageSize   int    `json:"page_size,omitempty"`
+	PageToken  string `json:"page_token,omitempty"`
+}
+
+// AvailableMetric represents an available metric in Cloud Monitoring
+type AvailableMetric struct {
+	Type         string            `json:"type"`
+	DisplayName  string            `json:"display_name"`
+	Description  string            `json:"description"`
+	MetricKind   string            `json:"metric_kind"`
+	ValueType    string            `json:"value_type"`
+	Unit         string            `json:"unit,omitempty"`
+	Labels       []MetricLabel     `json:"labels,omitempty"`
+	LaunchStage  string            `json:"launch_stage,omitempty"`
+}
+
+// MetricLabel represents a label for a metric
+type MetricLabel struct {
+	Key         string `json:"key"`
+	ValueType   string `json:"value_type"`
+	Description string `json:"description"`
+}
+
 // MonitoringClient defines the interface for Cloud Monitoring operations
 type MonitoringClient interface {
 	CreateMetricDescriptor(ctx context.Context, req CreateMetricRequest) error
@@ -75,6 +101,7 @@ type MonitoringClient interface {
 	ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) ([]TimeSeriesData, error)
 	ListMetricDescriptors(ctx context.Context, filter string) ([]MetricDescriptor, error)
 	DeleteMetricDescriptor(ctx context.Context, metricType string) error
+	ListAvailableMetrics(ctx context.Context, req ListAvailableMetricsRequest) ([]AvailableMetric, error)
 }
 
 // CloudMonitoringClient implements MonitoringClient using Google Cloud Monitoring
@@ -90,6 +117,7 @@ type MonitoringClientInterface interface {
 	ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) ([]TimeSeriesData, error)
 	ListMetricDescriptors(ctx context.Context, filter string) ([]MetricDescriptor, error)
 	DeleteMetricDescriptor(ctx context.Context, metricType string) error
+	ListAvailableMetrics(ctx context.Context, req ListAvailableMetricsRequest) ([]AvailableMetric, error)
 }
 
 // New creates a new CloudMonitoringClient
@@ -145,6 +173,11 @@ func (c *CloudMonitoringClient) ListMetricDescriptors(ctx context.Context, filte
 // DeleteMetricDescriptor deletes a custom metric descriptor
 func (c *CloudMonitoringClient) DeleteMetricDescriptor(ctx context.Context, metricType string) error {
 	return c.client.DeleteMetricDescriptor(ctx, metricType)
+}
+
+// ListAvailableMetrics lists available metrics in Cloud Monitoring
+func (c *CloudMonitoringClient) ListAvailableMetrics(ctx context.Context, req ListAvailableMetricsRequest) ([]AvailableMetric, error) {
+	return c.client.ListAvailableMetrics(ctx, req)
 }
 
 // realMonitoringClient wraps the actual Google Cloud Monitoring clients
@@ -396,6 +429,93 @@ func (r *realMonitoringClient) DeleteMetricDescriptor(ctx context.Context, metri
 	}
 
 	return r.metricClient.DeleteMetricDescriptor(ctx, pbReq)
+}
+
+// ListAvailableMetrics implements MonitoringClientInterface for the real client
+func (r *realMonitoringClient) ListAvailableMetrics(ctx context.Context, req ListAvailableMetricsRequest) ([]AvailableMetric, error) {
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 100 // default page size
+	}
+
+	pbReq := &monitoringpb.ListMetricDescriptorsRequest{
+		Name:     fmt.Sprintf("projects/%s", r.projectID),
+		Filter:   req.Filter,
+		PageSize: int32(pageSize),
+	}
+
+	if req.PageToken != "" {
+		pbReq.PageToken = req.PageToken
+	}
+
+	it := r.metricClient.ListMetricDescriptors(ctx, pbReq)
+	var result []AvailableMetric
+
+	for {
+		md, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		var metricKind string
+		switch md.MetricKind {
+		case metric.MetricDescriptor_GAUGE:
+			metricKind = "GAUGE"
+		case metric.MetricDescriptor_DELTA:
+			metricKind = "DELTA"
+		case metric.MetricDescriptor_CUMULATIVE:
+			metricKind = "CUMULATIVE"
+		default:
+			metricKind = "GAUGE"
+		}
+
+		var valueType string
+		switch md.ValueType {
+		case metric.MetricDescriptor_BOOL:
+			valueType = "BOOL"
+		case metric.MetricDescriptor_INT64:
+			valueType = "INT64"
+		case metric.MetricDescriptor_DOUBLE:
+			valueType = "DOUBLE"
+		case metric.MetricDescriptor_STRING:
+			valueType = "STRING"
+		case metric.MetricDescriptor_DISTRIBUTION:
+			valueType = "DISTRIBUTION"
+		default:
+			valueType = "DOUBLE"
+		}
+
+		// Convert label descriptors
+		var labels []MetricLabel
+		for _, labelDesc := range md.Labels {
+			labels = append(labels, MetricLabel{
+				Key:         labelDesc.Key,
+				ValueType:   "STRING", // Default to STRING for now
+				Description: labelDesc.Description,
+			})
+		}
+
+		var launchStage string
+		if md.Metadata != nil {
+			launchStage = md.Metadata.LaunchStage.String()
+		}
+
+		result = append(result, AvailableMetric{
+			Type:        md.Type,
+			DisplayName: md.DisplayName,
+			Description: md.Description,
+			MetricKind:  metricKind,
+			ValueType:   valueType,
+			Unit:        md.Unit,
+			Labels:      labels,
+			LaunchStage: launchStage,
+		})
+	}
+
+	return result, nil
 }
 
 // parseDuration converts a duration string to a protobuf duration

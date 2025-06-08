@@ -69,6 +69,21 @@ func (mr *MockMonitoringClientMockRecorder) DeleteMetricDescriptor(ctx, metricTy
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteMetricDescriptor", reflect.TypeOf((*MockMonitoringClient)(nil).DeleteMetricDescriptor), ctx, metricType)
 }
 
+// ListAvailableMetrics mocks base method.
+func (m *MockMonitoringClient) ListAvailableMetrics(ctx context.Context, req monitoring.ListAvailableMetricsRequest) ([]monitoring.AvailableMetric, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAvailableMetrics", ctx, req)
+	ret0, _ := ret[0].([]monitoring.AvailableMetric)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAvailableMetrics indicates an expected call of ListAvailableMetrics.
+func (mr *MockMonitoringClientMockRecorder) ListAvailableMetrics(ctx, req any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAvailableMetrics", reflect.TypeOf((*MockMonitoringClient)(nil).ListAvailableMetrics), ctx, req)
+}
+
 // ListMetricDescriptors mocks base method.
 func (m *MockMonitoringClient) ListMetricDescriptors(ctx context.Context, filter string) ([]monitoring.MetricDescriptor, error) {
 	m.ctrl.T.Helper()
@@ -163,6 +178,21 @@ func (m *MockMonitoringClientInterface) DeleteMetricDescriptor(ctx context.Conte
 func (mr *MockMonitoringClientInterfaceMockRecorder) DeleteMetricDescriptor(ctx, metricType any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteMetricDescriptor", reflect.TypeOf((*MockMonitoringClientInterface)(nil).DeleteMetricDescriptor), ctx, metricType)
+}
+
+// ListAvailableMetrics mocks base method.
+func (m *MockMonitoringClientInterface) ListAvailableMetrics(ctx context.Context, req monitoring.ListAvailableMetricsRequest) ([]monitoring.AvailableMetric, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAvailableMetrics", ctx, req)
+	ret0, _ := ret[0].([]monitoring.AvailableMetric)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAvailableMetrics indicates an expected call of ListAvailableMetrics.
+func (mr *MockMonitoringClientInterfaceMockRecorder) ListAvailableMetrics(ctx, req any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAvailableMetrics", reflect.TypeOf((*MockMonitoringClientInterface)(nil).ListAvailableMetrics), ctx, req)
 }
 
 // ListMetricDescriptors mocks base method.

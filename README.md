@@ -19,6 +19,7 @@ A Model Context Protocol (MCP) server for Google Cloud Platform telemetry servic
 - ✅ Advanced aggregation options (alignment periods, reducers)
 - ✅ Delete custom metric descriptors
 - ✅ List available metric descriptors
+- ✅ Discover available Google Cloud service metrics
 
 ### Planned Features
 - 🔄 Cloud Trace
@@ -228,6 +229,23 @@ Delete a custom metric descriptor from Cloud Monitoring.
 ```json
 {
   "metric_type": "custom.googleapis.com/my_old_metric"
+}
+```
+
+#### `list_available_metrics`
+
+List available metrics in Cloud Monitoring including Google Cloud service metrics.
+
+**Parameters:**
+- `filter` (string, optional): Filter expression for metrics (e.g., 'metric.type=starts_with("compute.googleapis.com/")')
+- `page_size` (number, optional): Maximum number of metrics to return (default: 100)
+- `page_token` (string, optional): Page token for pagination
+
+**Example:**
+```json
+{
+  "filter": "metric.type=starts_with(\"compute.googleapis.com/\")",
+  "page_size": 50
 }
 ```
 
