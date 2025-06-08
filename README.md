@@ -8,10 +8,19 @@ A Model Context Protocol (MCP) server for Google Cloud Platform telemetry servic
 - ✅ Write log entries with structured data
 - ✅ Support for multiple severity levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - ✅ Custom labels and structured payloads
-- ✅ List log entries (basic implementation)
+- ✅ List log entries with filtering and pagination
+
+### Cloud Monitoring
+- ✅ Create custom metric descriptors
+- ✅ Write time series data points
+- ✅ Query time series data with advanced filtering
+- ✅ Support for all metric kinds (GAUGE, DELTA, CUMULATIVE)
+- ✅ Support for all value types (BOOL, INT64, DOUBLE, STRING, DISTRIBUTION)
+- ✅ Advanced aggregation options (alignment periods, reducers)
+- ✅ Delete custom metric descriptors
+- ✅ List available metric descriptors
 
 ### Planned Features
-- 🔄 Cloud Monitoring
 - 🔄 Cloud Trace
 - 🔄 Cloud Profiler
 
@@ -60,7 +69,7 @@ export GOOGLE_CLOUD_PROJECT="your-project-id"
 ### Running the Server
 
 ```bash
-./cloud-logging-mcp
+./gcp-telemetry-mcp
 ```
 
 Or with Go:
@@ -72,6 +81,8 @@ go run main.go
 ### MCP Tools
 
 The server provides the following MCP tools:
+
+## Cloud Logging Tools
 
 #### `write_log_entry`
 
@@ -118,6 +129,108 @@ List log entries from Cloud Logging.
 }
 ```
 
+## Cloud Monitoring Tools
+
+#### `create_metric_descriptor`
+
+Create a custom metric descriptor in Cloud Monitoring.
+
+**Parameters:**
+- `type` (string, required): Metric type (e.g., 'custom.googleapis.com/my_metric')
+- `metric_kind` (string, required): Metric kind (GAUGE, DELTA, or CUMULATIVE)
+- `value_type` (string, required): Value type (BOOL, INT64, DOUBLE, STRING, or DISTRIBUTION)
+- `description` (string, required): Description of the metric
+- `display_name` (string, optional): Display name for the metric
+
+**Example:**
+```json
+{
+  "type": "custom.googleapis.com/app/response_time",
+  "metric_kind": "GAUGE",
+  "value_type": "DOUBLE",
+  "description": "Application response time in seconds",
+  "display_name": "App Response Time"
+}
+```
+
+#### `write_time_series`
+
+Write time series data to Cloud Monitoring.
+
+**Parameters:**
+- `metric_type` (string, required): Metric type to write data for
+- `resource_type` (string, required): Resource type (e.g., 'global', 'gce_instance')
+- `value` (number, required): Metric value to write
+- `metric_labels` (object, optional): Optional metric labels
+- `timestamp` (string, optional): Timestamp for the data point (ISO 8601 format, defaults to now)
+
+**Example:**
+```json
+{
+  "metric_type": "custom.googleapis.com/app/response_time",
+  "resource_type": "global",
+  "value": 0.125,
+  "metric_labels": {
+    "service": "api",
+    "version": "v1.2.0"
+  },
+  "timestamp": "2024-01-01T12:00:00Z"
+}
+```
+
+#### `list_time_series`
+
+List time series data from Cloud Monitoring.
+
+**Parameters:**
+- `filter` (string, required): Monitoring filter expression
+- `start_time` (string, required): Start time for the query (ISO 8601 format)
+- `end_time` (string, required): End time for the query (ISO 8601 format)
+- `aggregation` (object, optional): Aggregation configuration
+
+**Example:**
+```json
+{
+  "filter": "metric.type=\"compute.googleapis.com/instance/cpu/usage\"",
+  "start_time": "2024-01-01T10:00:00Z",
+  "end_time": "2024-01-01T12:00:00Z",
+  "aggregation": {
+    "alignment_period": "60s",
+    "per_series_aligner": "ALIGN_MEAN",
+    "cross_series_reducer": "REDUCE_MEAN",
+    "group_by_fields": ["resource.zone"]
+  }
+}
+```
+
+#### `list_metric_descriptors`
+
+List metric descriptors from Cloud Monitoring.
+
+**Parameters:**
+- `filter` (string, optional): Filter expression for metric descriptors
+
+**Example:**
+```json
+{
+  "filter": "metric.type=starts_with(\"custom.googleapis.com/\")"
+}
+```
+
+#### `delete_metric_descriptor`
+
+Delete a custom metric descriptor from Cloud Monitoring.
+
+**Parameters:**
+- `metric_type` (string, required): Metric type to delete
+
+**Example:**
+```json
+{
+  "metric_type": "custom.googleapis.com/my_old_metric"
+}
+```
+
 ## Development
 
 ### Running Tests
@@ -130,11 +243,15 @@ go test ./...
 
 ```
 .
-├── main.go              # MCP server implementation
+├── main.go              # MCP server implementation and tool handlers
 ├── logging/
 │   ├── client.go        # Cloud Logging client implementation
 │   └── client_test.go   # Tests for logging client
+├── monitoring/
+│   ├── client.go        # Cloud Monitoring client implementation
+│   └── client_test.go   # Tests for monitoring client
 ├── go.mod               # Go module definition
+├── go.sum               # Go dependency checksums
 └── README.md           # This file
 ```
 
@@ -144,8 +261,11 @@ The server provides detailed error messages for common issues:
 
 - Missing `GOOGLE_CLOUD_PROJECT` environment variable
 - Authentication failures
-- Invalid log parameters
+- Invalid parameters for logging and monitoring operations
 - Cloud Logging API errors
+- Cloud Monitoring API errors
+- Time series data validation errors
+- Metric descriptor creation/deletion failures
 
 ## Contributing
 
@@ -163,4 +283,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For issues and questions:
 - Create an issue in the GitHub repository
-- Check Google Cloud Logging documentation for API-specific questions
+- Check Google Cloud Logging documentation for logging-specific questions
+- Check Google Cloud Monitoring documentation for monitoring-specific questions
