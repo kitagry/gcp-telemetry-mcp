@@ -21,8 +21,13 @@ A Model Context Protocol (MCP) server for Google Cloud Platform telemetry servic
 - ✅ List available metric descriptors
 - ✅ Discover available Google Cloud service metrics
 
+### Cloud Trace
+- ✅ List traces with advanced filtering and pagination
+- ✅ Get specific traces by trace ID
+- ✅ Update/patch trace spans with new data
+- ✅ Support for distributed trace analysis
+
 ### Planned Features
-- 🔄 Cloud Trace
 - 🔄 Cloud Profiler
 
 ## Prerequisites
@@ -249,6 +254,74 @@ List available metrics in Cloud Monitoring including Google Cloud service metric
 }
 ```
 
+## Cloud Trace Tools
+
+#### `list_traces`
+
+List traces from Cloud Trace.
+
+**Parameters:**
+- `start_time` (string, required): Start time for the query (ISO 8601 format)
+- `end_time` (string, required): End time for the query (ISO 8601 format)
+- `filter` (string, optional): Filter expression (e.g., 'span_name_prefix:"api"')
+- `order_by` (string, optional): Order by field (e.g., 'start_time desc')
+- `page_size` (number, optional): Maximum number of traces to return (default: 100)
+- `page_token` (string, optional): Page token for pagination
+
+**Example:**
+```json
+{
+  "start_time": "2024-01-01T10:00:00Z",
+  "end_time": "2024-01-01T12:00:00Z",
+  "filter": "span_name_prefix:\"api\"",
+  "order_by": "start_time desc",
+  "page_size": 50
+}
+```
+
+#### `get_trace`
+
+Get a specific trace from Cloud Trace.
+
+**Parameters:**
+- `trace_id` (string, required): Trace ID to retrieve
+
+**Example:**
+```json
+{
+  "trace_id": "1234567890abcdef1234567890abcdef"
+}
+```
+
+#### `patch_traces`
+
+Update trace spans in Cloud Trace.
+
+**Parameters:**
+- `trace_id` (string, required): Trace ID to update
+- `spans` (array, required): Array of span objects to update or create
+
+**Example:**
+```json
+{
+  "trace_id": "1234567890abcdef1234567890abcdef",
+  "spans": [
+    {
+      "span_id": "span123",
+      "name": "updated-operation",
+      "start_time": "2024-01-01T12:00:00Z",
+      "end_time": "2024-01-01T12:00:05Z",
+      "parent_id": "parent123",
+      "kind": "RPC_CLIENT",
+      "labels": {
+        "service": "api",
+        "version": "v2.0"
+      }
+    }
+  ]
+}
+```
+
 ## Development
 
 ### Running Tests
@@ -268,6 +341,9 @@ go test ./...
 ├── monitoring/
 │   ├── client.go        # Cloud Monitoring client implementation
 │   └── client_test.go   # Tests for monitoring client
+├── trace/
+│   ├── client.go        # Cloud Trace client implementation
+│   └── client_test.go   # Tests for trace client
 ├── go.mod               # Go module definition
 ├── go.sum               # Go dependency checksums
 └── README.md           # This file
@@ -284,6 +360,8 @@ The server provides detailed error messages for common issues:
 - Cloud Monitoring API errors
 - Time series data validation errors
 - Metric descriptor creation/deletion failures
+- Cloud Trace API errors
+- Trace retrieval and span update failures
 
 ## Contributing
 
@@ -303,3 +381,4 @@ For issues and questions:
 - Create an issue in the GitHub repository
 - Check Google Cloud Logging documentation for logging-specific questions
 - Check Google Cloud Monitoring documentation for monitoring-specific questions
+- Check Google Cloud Trace documentation for trace-specific questions

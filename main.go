@@ -9,6 +9,7 @@ import (
 
 	"github.com/kitagry/gcp-telemetry-mcp/logging"
 	"github.com/kitagry/gcp-telemetry-mcp/monitoring"
+	"github.com/kitagry/gcp-telemetry-mcp/trace"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -32,6 +33,13 @@ func main() {
 	monitoringClient, err := monitoring.New(projectID)
 	if err != nil {
 		fmt.Printf("Failed to create monitoring client: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create Cloud Trace client
+	traceClient, err := trace.New(projectID)
+	if err != nil {
+		fmt.Printf("Failed to create trace client: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -174,6 +182,53 @@ func main() {
 		),
 	)
 
+	// Add list_traces tool
+	listTracesTool := mcp.NewTool("list_traces",
+		mcp.WithDescription("List traces from Cloud Trace"),
+		mcp.WithString("start_time",
+			mcp.Required(),
+			mcp.Description("Start time for the query (ISO 8601 format)"),
+		),
+		mcp.WithString("end_time",
+			mcp.Required(),
+			mcp.Description("End time for the query (ISO 8601 format)"),
+		),
+		mcp.WithString("filter",
+			mcp.Description("Filter expression (e.g., 'span_name_prefix:\"api\"')"),
+		),
+		mcp.WithString("order_by",
+			mcp.Description("Order by field (e.g., 'start_time desc')"),
+		),
+		mcp.WithNumber("page_size",
+			mcp.Description("Maximum number of traces to return (default: 100)"),
+		),
+		mcp.WithString("page_token",
+			mcp.Description("Page token for pagination"),
+		),
+	)
+
+	// Add get_trace tool
+	getTraceTool := mcp.NewTool("get_trace",
+		mcp.WithDescription("Get a specific trace from Cloud Trace"),
+		mcp.WithString("trace_id",
+			mcp.Required(),
+			mcp.Description("Trace ID to retrieve"),
+		),
+	)
+
+	// Add patch_traces tool
+	patchTracesTool := mcp.NewTool("patch_traces",
+		mcp.WithDescription("Update trace spans in Cloud Trace"),
+		mcp.WithString("trace_id",
+			mcp.Required(),
+			mcp.Description("Trace ID to update"),
+		),
+		mcp.WithObject("spans",
+			mcp.Required(),
+			mcp.Description("Array of span objects to update or create"),
+		),
+	)
+
 	// Add tool handlers
 	s.AddTool(writeLogTool, createWriteLogHandler(loggingClient))
 	s.AddTool(listLogsTool, createListLogsHandler(loggingClient))
@@ -183,6 +238,9 @@ func main() {
 	s.AddTool(listMetricDescriptorsTool, createListMetricDescriptorsHandler(monitoringClient))
 	s.AddTool(deleteMetricTool, createDeleteMetricDescriptorHandler(monitoringClient))
 	s.AddTool(listAvailableMetricsTool, createListAvailableMetricsHandler(monitoringClient))
+	s.AddTool(listTracesTool, createListTracesHandler(traceClient))
+	s.AddTool(getTraceTool, createGetTraceHandler(traceClient))
+	s.AddTool(patchTracesTool, createPatchTracesHandler(traceClient))
 
 	// Start the stdio server
 	if err := server.ServeStdio(s); err != nil {
@@ -554,5 +612,187 @@ func createListAvailableMetricsHandler(client monitoring.MonitoringClient) func(
 		}
 
 		return mcp.NewToolResultText(string(metricsJSON)), nil
+	}
+}
+
+// createListTracesHandler creates a handler for listing traces
+func createListTracesHandler(client trace.TraceClient) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		startTimeStr, err := request.RequireString("start_time")
+		if err != nil {
+			return mcp.NewToolResultError("start_time is required"), nil
+		}
+
+		endTimeStr, err := request.RequireString("end_time")
+		if err != nil {
+			return mcp.NewToolResultError("end_time is required"), nil
+		}
+
+		startTime, err := time.Parse(time.RFC3339, startTimeStr)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid start_time format: %v", err)), nil
+		}
+
+		endTime, err := time.Parse(time.RFC3339, endTimeStr)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid end_time format: %v", err)), nil
+		}
+
+		args := request.GetArguments()
+		req := trace.ListTracesRequest{
+			StartTime: startTime,
+			EndTime:   endTime,
+			PageSize:  100, // default
+		}
+
+		// Parse optional filter parameter
+		if filterArg, exists := args["filter"]; exists {
+			if filter, ok := filterArg.(string); ok && filter != "" {
+				req.Filter = filter
+			}
+		}
+
+		// Parse optional order_by parameter
+		if orderByArg, exists := args["order_by"]; exists {
+			if orderBy, ok := orderByArg.(string); ok && orderBy != "" {
+				req.OrderBy = orderBy
+			}
+		}
+
+		// Parse optional page_size parameter
+		if pageSizeArg, exists := args["page_size"]; exists {
+			if pageSize, ok := pageSizeArg.(float64); ok && pageSize > 0 {
+				req.PageSize = int(pageSize)
+			}
+		}
+
+		// Parse optional page_token parameter
+		if pageTokenArg, exists := args["page_token"]; exists {
+			if pageToken, ok := pageTokenArg.(string); ok && pageToken != "" {
+				req.PageToken = pageToken
+			}
+		}
+
+		traces, err := client.ListTraces(ctx, req)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to list traces: %v", err)), nil
+		}
+
+		// Convert traces to JSON for response
+		tracesJSON, err := json.MarshalIndent(traces, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal traces: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(string(tracesJSON)), nil
+	}
+}
+
+// createGetTraceHandler creates a handler for getting a specific trace
+func createGetTraceHandler(client trace.TraceClient) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		traceID, err := request.RequireString("trace_id")
+		if err != nil {
+			return mcp.NewToolResultError("trace_id is required"), nil
+		}
+
+		req := trace.GetTraceRequest{
+			TraceID: traceID,
+		}
+
+		traceResult, err := client.GetTrace(ctx, req)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to get trace: %v", err)), nil
+		}
+
+		// Convert trace to JSON for response
+		traceJSON, err := json.MarshalIndent(traceResult, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal trace: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(string(traceJSON)), nil
+	}
+}
+
+// createPatchTracesHandler creates a handler for updating trace spans
+func createPatchTracesHandler(client trace.TraceClient) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		traceID, err := request.RequireString("trace_id")
+		if err != nil {
+			return mcp.NewToolResultError("trace_id is required"), nil
+		}
+
+		args := request.GetArguments()
+		spansArg, exists := args["spans"]
+		if !exists {
+			return mcp.NewToolResultError("spans is required"), nil
+		}
+
+		// Parse spans from the request
+		var spans []trace.Span
+		if spansArray, ok := spansArg.([]any); ok {
+			for _, spanData := range spansArray {
+				if spanObj, ok := spanData.(map[string]any); ok {
+					span := trace.Span{}
+
+					if spanID, ok := spanObj["span_id"].(string); ok {
+						span.SpanID = spanID
+					}
+
+					if name, ok := spanObj["name"].(string); ok {
+						span.Name = name
+					}
+
+					if parentID, ok := spanObj["parent_id"].(string); ok {
+						span.ParentID = parentID
+					}
+
+					if kind, ok := spanObj["kind"].(string); ok {
+						span.Kind = kind
+					}
+
+					// Parse start_time
+					if startTimeStr, ok := spanObj["start_time"].(string); ok {
+						if startTime, parseErr := time.Parse(time.RFC3339, startTimeStr); parseErr == nil {
+							span.StartTime = startTime
+						}
+					}
+
+					// Parse end_time
+					if endTimeStr, ok := spanObj["end_time"].(string); ok {
+						if endTime, parseErr := time.Parse(time.RFC3339, endTimeStr); parseErr == nil {
+							span.EndTime = endTime
+						}
+					}
+
+					// Parse labels
+					if labelsObj, ok := spanObj["labels"].(map[string]any); ok {
+						span.Labels = make(map[string]string)
+						for k, v := range labelsObj {
+							if str, ok := v.(string); ok {
+								span.Labels[k] = str
+							}
+						}
+					}
+
+					spans = append(spans, span)
+				}
+			}
+		} else {
+			return mcp.NewToolResultError("spans must be an array of span objects"), nil
+		}
+
+		req := trace.PatchTraceRequest{
+			TraceID: traceID,
+			Spans:   spans,
+		}
+
+		err = client.PatchTraces(ctx, req)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to patch traces: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText("Trace spans updated successfully"), nil
 	}
 }
