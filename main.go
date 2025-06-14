@@ -178,7 +178,12 @@ func main() {
 	listMetricDescriptorsTool := mcp.NewTool("list_metric_descriptors",
 		mcp.WithDescription("List metric descriptors from Cloud Monitoring"),
 		mcp.WithString("filter",
-			mcp.Description("Filter expression for metric descriptors"),
+			mcp.Description(`Filter expression for metric descriptors.
+If this field is empty, all custom and system-defined metric descriptors are returned.
+Otherwise, the [filter](https://cloud.google.com/monitoring/api/v3/filters) specifies which metric descriptors are to be returned. For example, the following filter matches all [custom metrics](https://cloud.google.com/monitoring/custom-metrics):
+
+metric.type = starts_with("custom.googleapis.com/")
+`),
 		),
 	)
 
@@ -195,7 +200,12 @@ func main() {
 	listAvailableMetricsTool := mcp.NewTool("list_available_metrics",
 		mcp.WithDescription("List available metrics in Cloud Monitoring"),
 		mcp.WithString("filter",
-			mcp.Description("Filter expression for metrics (e.g., 'metric.type=starts_with(\"compute.googleapis.com/\")')"),
+			mcp.Description(`Filter expression for metric descriptors.
+If this field is empty, all custom and system-defined metric descriptors are returned.
+Otherwise, the [filter](https://cloud.google.com/monitoring/api/v3/filters) specifies which metric descriptors are to be returned. For example, the following filter matches all [custom metrics](https://cloud.google.com/monitoring/custom-metrics):
+
+metric.type = starts_with("custom.googleapis.com/")
+`),
 		),
 		mcp.WithNumber("page_size",
 			mcp.Description("Maximum number of metrics to return (default: 100)"),

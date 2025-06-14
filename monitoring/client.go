@@ -451,7 +451,7 @@ func (r *realMonitoringClient) ListAvailableMetrics(ctx context.Context, req Lis
 	it := r.metricClient.ListMetricDescriptors(ctx, pbReq)
 	var result []AvailableMetric
 
-	for {
+	for i := 0; i < pageSize; i++ {
 		md, err := it.Next()
 		if err == iterator.Done {
 			break

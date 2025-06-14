@@ -15,30 +15,30 @@ import (
 
 // Span represents a trace span
 type Span struct {
-	SpanID     string            `json:"span_id"`
-	Name       string            `json:"name"`
-	StartTime  time.Time         `json:"start_time"`
-	EndTime    time.Time         `json:"end_time"`
-	ParentID   string            `json:"parent_id,omitempty"`
-	Kind       string            `json:"kind,omitempty"`
-	Labels     map[string]string `json:"labels,omitempty"`
+	SpanID    string            `json:"span_id"`
+	Name      string            `json:"name"`
+	StartTime time.Time         `json:"start_time"`
+	EndTime   time.Time         `json:"end_time"`
+	ParentID  string            `json:"parent_id,omitempty"`
+	Kind      string            `json:"kind,omitempty"`
+	Labels    map[string]string `json:"labels,omitempty"`
 }
 
 // Trace represents a distributed trace
 type Trace struct {
-	TraceID   string  `json:"trace_id"`
-	ProjectID string  `json:"project_id"`
-	Spans     []Span  `json:"spans"`
+	TraceID   string `json:"trace_id"`
+	ProjectID string `json:"project_id"`
+	Spans     []Span `json:"spans"`
 }
 
 // ListTracesRequest represents a request to list traces
 type ListTracesRequest struct {
-	StartTime  time.Time `json:"start_time"`
-	EndTime    time.Time `json:"end_time"`
-	Filter     string    `json:"filter,omitempty"`
-	OrderBy    string    `json:"order_by,omitempty"`
-	PageSize   int       `json:"page_size,omitempty"`
-	PageToken  string    `json:"page_token,omitempty"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
+	Filter    string    `json:"filter,omitempty"`
+	OrderBy   string    `json:"order_by,omitempty"`
+	PageSize  int       `json:"page_size,omitempty"`
+	PageToken string    `json:"page_token,omitempty"`
 }
 
 // GetTraceRequest represents a request to get a specific trace
@@ -125,10 +125,10 @@ func (r *realTraceClient) ListTraces(ctx context.Context, req ListTracesRequest)
 	}
 
 	pbReq := &tracepb.ListTracesRequest{
-		ProjectId:  r.projectID,
-		StartTime:  timestamppb.New(req.StartTime),
-		EndTime:    timestamppb.New(req.EndTime),
-		PageSize:   int32(pageSize),
+		ProjectId: r.projectID,
+		StartTime: timestamppb.New(req.StartTime),
+		EndTime:   timestamppb.New(req.EndTime),
+		PageSize:  int32(pageSize),
 	}
 
 	if req.Filter != "" {
@@ -146,7 +146,7 @@ func (r *realTraceClient) ListTraces(ctx context.Context, req ListTracesRequest)
 	it := r.client.ListTraces(ctx, pbReq)
 	var result []Trace
 
-	for {
+	for i := 0; i <= pageSize; i++ {
 		traceProto, err := it.Next()
 		if err == iterator.Done {
 			break
