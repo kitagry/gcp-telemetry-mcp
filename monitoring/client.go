@@ -99,7 +99,7 @@ type MonitoringClient interface {
 	CreateMetricDescriptor(ctx context.Context, req CreateMetricRequest) error
 	WriteTimeSeries(ctx context.Context, req WriteTimeSeriesRequest) error
 	ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) ([]TimeSeriesData, error)
-	ListMetricDescriptors(ctx context.Context, filter string) ([]MetricDescriptor, error)
+	ListMetricDescriptors(ctx context.Context, req ListMetricDescriptorsRequest) (ListMetricDescriptorsResponse, error)
 	DeleteMetricDescriptor(ctx context.Context, metricType string) error
 	ListAvailableMetrics(ctx context.Context, req ListAvailableMetricsRequest) ([]AvailableMetric, error)
 }
@@ -115,7 +115,7 @@ type MonitoringClientInterface interface {
 	CreateMetricDescriptor(ctx context.Context, req CreateMetricRequest) error
 	WriteTimeSeries(ctx context.Context, req WriteTimeSeriesRequest) error
 	ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) ([]TimeSeriesData, error)
-	ListMetricDescriptors(ctx context.Context, filter string) ([]MetricDescriptor, error)
+	ListMetricDescriptors(ctx context.Context, req ListMetricDescriptorsRequest) (ListMetricDescriptorsResponse, error)
 	DeleteMetricDescriptor(ctx context.Context, metricType string) error
 	ListAvailableMetrics(ctx context.Context, req ListAvailableMetricsRequest) ([]AvailableMetric, error)
 }
@@ -165,9 +165,9 @@ func (c *CloudMonitoringClient) ListTimeSeries(ctx context.Context, req ListTime
 	return c.client.ListTimeSeries(ctx, req)
 }
 
-// ListMetricDescriptors lists metric descriptors
-func (c *CloudMonitoringClient) ListMetricDescriptors(ctx context.Context, filter string) ([]MetricDescriptor, error) {
-	return c.client.ListMetricDescriptors(ctx, filter)
+// ListMetricDescriptors lists metric descriptors with pagination support
+func (c *CloudMonitoringClient) ListMetricDescriptors(ctx context.Context, req ListMetricDescriptorsRequest) (ListMetricDescriptorsResponse, error) {
+	return c.client.ListMetricDescriptors(ctx, req)
 }
 
 // DeleteMetricDescriptor deletes a custom metric descriptor
@@ -367,23 +367,47 @@ func (r *realMonitoringClient) ListTimeSeries(ctx context.Context, req ListTimeS
 	return result, nil
 }
 
+// ListMetricDescriptorsRequest represents a request to list metric descriptors
+type ListMetricDescriptorsRequest struct {
+	Filter    string `json:"filter,omitempty"`
+	PageSize  int    `json:"page_size,omitempty"`
+	PageToken string `json:"page_token,omitempty"`
+}
+
+// ListMetricDescriptorsResponse represents a response with metric descriptors and pagination info
+type ListMetricDescriptorsResponse struct {
+	Descriptors   []MetricDescriptor `json:"descriptors"`
+	NextPageToken string             `json:"next_page_token,omitempty"`
+}
+
 // ListMetricDescriptors implements MonitoringClientInterface for the real client
-func (r *realMonitoringClient) ListMetricDescriptors(ctx context.Context, filter string) ([]MetricDescriptor, error) {
+func (r *realMonitoringClient) ListMetricDescriptors(ctx context.Context, req ListMetricDescriptorsRequest) (ListMetricDescriptorsResponse, error) {
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 100 // default page size
+	}
+
 	pbReq := &monitoringpb.ListMetricDescriptorsRequest{
-		Name:   fmt.Sprintf("projects/%s", r.projectID),
-		Filter: filter,
+		Name:     fmt.Sprintf("projects/%s", r.projectID),
+		Filter:   req.Filter,
+		PageSize: int32(pageSize),
+	}
+
+	if req.PageToken != "" {
+		pbReq.PageToken = req.PageToken
 	}
 
 	it := r.metricClient.ListMetricDescriptors(ctx, pbReq)
 	var result []MetricDescriptor
 
-	for {
+	// 指定したページサイズまでデータを取得
+	for range pageSize {
 		md, err := it.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
-			return nil, err
+			return ListMetricDescriptorsResponse{}, err
 		}
 
 		var metricKind string
@@ -419,7 +443,13 @@ func (r *realMonitoringClient) ListMetricDescriptors(ctx context.Context, filter
 		})
 	}
 
-	return result, nil
+	// 次のページトークンを取得
+	nextPageToken := it.PageInfo().Token
+
+	return ListMetricDescriptorsResponse{
+		Descriptors:   result,
+		NextPageToken: nextPageToken,
+	}, nil
 }
 
 // DeleteMetricDescriptor implements MonitoringClientInterface for the real client

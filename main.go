@@ -159,7 +159,11 @@ func main() {
 		mcp.WithDescription("List time series data from Cloud Monitoring"),
 		mcp.WithString("filter",
 			mcp.Required(),
-			mcp.Description("Monitoring filter expression (e.g., 'metric.type=\"compute.googleapis.com/instance/cpu/usage\"')"),
+			mcp.Description(`A [monitoring filter](https://cloud.google.com/monitoring/api/v3/filters) that specifies which time series should be returned.  The filter must specify a single metric type, and can additionally specify metric labels and other information. For example:
+
+    metric.type = "compute.googleapis.com/instance/cpu/usage_time" AND
+        metric.labels.instance_name = "my-instance-name"
+			`),
 		),
 		mcp.WithString("start_time",
 			mcp.Required(),
@@ -668,17 +672,35 @@ func createListTimeSeriesHandler(client monitoring.MonitoringClient) func(contex
 func createListMetricDescriptorsHandler(client monitoring.MonitoringClient) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := request.GetArguments()
-		filter := ""
+		req := monitoring.ListMetricDescriptorsRequest{}
+
+		// Parse optional filter parameter
 		if filterArg, exists := args["filter"]; exists {
-			if f, ok := filterArg.(string); ok {
-				filter = f
+			if filter, ok := filterArg.(string); ok {
+				req.Filter = filter
 			}
 		}
 
-		descriptors, err := client.ListMetricDescriptors(ctx, filter)
+		// Parse optional page_size parameter (if added in the future)
+		if pageSizeArg, exists := args["page_size"]; exists {
+			if pageSize, ok := pageSizeArg.(float64); ok && pageSize > 0 {
+				req.PageSize = int(pageSize)
+			}
+		}
+
+		// Parse optional page_token parameter (if added in the future)
+		if pageTokenArg, exists := args["page_token"]; exists {
+			if pageToken, ok := pageTokenArg.(string); ok && pageToken != "" {
+				req.PageToken = pageToken
+			}
+		}
+
+		resp, err := client.ListMetricDescriptors(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to list metric descriptors: %v", err)), nil
 		}
+
+		descriptors := resp.Descriptors
 
 		// Convert descriptors to JSON for response
 		descriptorsJSON, err := json.MarshalIndent(descriptors, "", "  ")

@@ -137,22 +137,27 @@ func TestCloudMonitoringClient_ListMetricDescriptors(t *testing.T) {
 	client := monitoring.NewWithClient(mockClient, "test-project")
 
 	// Set expectation for ListMetricDescriptors call
+	expectedResponse := monitoring.ListMetricDescriptorsResponse{
+		Descriptors:   expectedDescriptors,
+		NextPageToken: "",
+	}
+
 	mockClient.EXPECT().
-		ListMetricDescriptors(gomock.Any(), "").
-		Return(expectedDescriptors, nil).
+		ListMetricDescriptors(gomock.Any(), monitoring.ListMetricDescriptorsRequest{}).
+		Return(expectedResponse, nil).
 		Times(1)
 
-	result, err := client.ListMetricDescriptors(context.Background(), "")
+	result, err := client.ListMetricDescriptors(context.Background(), monitoring.ListMetricDescriptorsRequest{})
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	if len(result) != 1 {
-		t.Errorf("Expected 1 metric descriptor, got %d", len(result))
+	if len(result.Descriptors) != 1 {
+		t.Errorf("Expected 1 metric descriptor, got %d", len(result.Descriptors))
 	}
 
-	if result[0].Type != expectedDescriptors[0].Type {
-		t.Errorf("Expected metric type %s, got %s", expectedDescriptors[0].Type, result[0].Type)
+	if result.Descriptors[0].Type != expectedDescriptors[0].Type {
+		t.Errorf("Expected metric type %s, got %s", expectedDescriptors[0].Type, result.Descriptors[0].Type)
 	}
 }
 

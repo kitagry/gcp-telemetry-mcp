@@ -85,18 +85,18 @@ func (mr *MockMonitoringClientMockRecorder) ListAvailableMetrics(ctx, req any) *
 }
 
 // ListMetricDescriptors mocks base method.
-func (m *MockMonitoringClient) ListMetricDescriptors(ctx context.Context, filter string) ([]monitoring.MetricDescriptor, error) {
+func (m *MockMonitoringClient) ListMetricDescriptors(ctx context.Context, req monitoring.ListMetricDescriptorsRequest) (monitoring.ListMetricDescriptorsResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListMetricDescriptors", ctx, filter)
-	ret0, _ := ret[0].([]monitoring.MetricDescriptor)
+	ret := m.ctrl.Call(m, "ListMetricDescriptors", ctx, req)
+	ret0, _ := ret[0].(monitoring.ListMetricDescriptorsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListMetricDescriptors indicates an expected call of ListMetricDescriptors.
-func (mr *MockMonitoringClientMockRecorder) ListMetricDescriptors(ctx, filter any) *gomock.Call {
+func (mr *MockMonitoringClientMockRecorder) ListMetricDescriptors(ctx, req any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMetricDescriptors", reflect.TypeOf((*MockMonitoringClient)(nil).ListMetricDescriptors), ctx, filter)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMetricDescriptors", reflect.TypeOf((*MockMonitoringClient)(nil).ListMetricDescriptors), ctx, req)
 }
 
 // ListTimeSeries mocks base method.
@@ -196,18 +196,18 @@ func (mr *MockMonitoringClientInterfaceMockRecorder) ListAvailableMetrics(ctx, r
 }
 
 // ListMetricDescriptors mocks base method.
-func (m *MockMonitoringClientInterface) ListMetricDescriptors(ctx context.Context, filter string) ([]monitoring.MetricDescriptor, error) {
+func (m *MockMonitoringClientInterface) ListMetricDescriptors(ctx context.Context, req monitoring.ListMetricDescriptorsRequest) (monitoring.ListMetricDescriptorsResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListMetricDescriptors", ctx, filter)
-	ret0, _ := ret[0].([]monitoring.MetricDescriptor)
+	ret := m.ctrl.Call(m, "ListMetricDescriptors", ctx, req)
+	ret0, _ := ret[0].(monitoring.ListMetricDescriptorsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListMetricDescriptors indicates an expected call of ListMetricDescriptors.
-func (mr *MockMonitoringClientInterfaceMockRecorder) ListMetricDescriptors(ctx, filter any) *gomock.Call {
+func (mr *MockMonitoringClientInterfaceMockRecorder) ListMetricDescriptors(ctx, req any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMetricDescriptors", reflect.TypeOf((*MockMonitoringClientInterface)(nil).ListMetricDescriptors), ctx, filter)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMetricDescriptors", reflect.TypeOf((*MockMonitoringClientInterface)(nil).ListMetricDescriptors), ctx, req)
 }
 
 // ListTimeSeries mocks base method.
