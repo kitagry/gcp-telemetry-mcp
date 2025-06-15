@@ -99,10 +99,15 @@ func TestCloudMonitoringClient_ListTimeSeries(t *testing.T) {
 	req.Interval.StartTime = time.Now().Add(-1 * time.Hour)
 	req.Interval.EndTime = time.Now()
 
+	expectedResponse := monitoring.ListTimeSeriesResponse{
+		TimeSeries:    expectedTimeSeries,
+		NextPageToken: "",
+	}
+
 	// Set expectation for ListTimeSeries call
 	mockClient.EXPECT().
 		ListTimeSeries(gomock.Any(), req).
-		Return(expectedTimeSeries, nil).
+		Return(expectedResponse, nil).
 		Times(1)
 
 	result, err := client.ListTimeSeries(context.Background(), req)
@@ -110,12 +115,70 @@ func TestCloudMonitoringClient_ListTimeSeries(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	if len(result) != 1 {
-		t.Errorf("Expected 1 time series, got %d", len(result))
+	if len(result.TimeSeries) != 1 {
+		t.Errorf("Expected 1 time series, got %d", len(result.TimeSeries))
 	}
 
-	if result[0].MetricType != expectedTimeSeries[0].MetricType {
-		t.Errorf("Expected metric type %s, got %s", expectedTimeSeries[0].MetricType, result[0].MetricType)
+	if result.TimeSeries[0].MetricType != expectedTimeSeries[0].MetricType {
+		t.Errorf("Expected metric type %s, got %s", expectedTimeSeries[0].MetricType, result.TimeSeries[0].MetricType)
+	}
+
+	if result.NextPageToken != "" {
+		t.Errorf("Expected empty next page token, got %s", result.NextPageToken)
+	}
+}
+
+func TestCloudMonitoringClient_ListTimeSeriesWithPagination(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	expectedTimeSeries := []monitoring.TimeSeriesData{
+		{
+			MetricType:   "custom.googleapis.com/test_metric",
+			ResourceType: "global",
+			Values: []monitoring.MetricValue{
+				{
+					Value:     42.0,
+					Timestamp: time.Now(),
+				},
+			},
+		},
+	}
+
+	mockClient := mocks.NewMockMonitoringClientInterface(ctrl)
+	client := monitoring.NewWithClient(mockClient, "test-project")
+
+	// テスト用のページネーションパラメータ
+	req := monitoring.ListTimeSeriesRequest{
+		Filter:    "metric.type=\"custom.googleapis.com/test_metric\"",
+		PageSize:  10,
+		PageToken: "test-page-token",
+	}
+	req.Interval.StartTime = time.Now().Add(-1 * time.Hour)
+	req.Interval.EndTime = time.Now()
+
+	expectedResponse := monitoring.ListTimeSeriesResponse{
+		TimeSeries:    expectedTimeSeries,
+		NextPageToken: "next-page-token",
+	}
+
+	// Set expectation for ListTimeSeries call with pagination parameters
+	mockClient.EXPECT().
+		ListTimeSeries(gomock.Any(), req).
+		Return(expectedResponse, nil).
+		Times(1)
+
+	result, err := client.ListTimeSeries(context.Background(), req)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if len(result.TimeSeries) != 1 {
+		t.Errorf("Expected 1 time series, got %d", len(result.TimeSeries))
+	}
+
+	if result.NextPageToken != "next-page-token" {
+		t.Errorf("Expected next page token 'next-page-token', got %s", result.NextPageToken)
 	}
 }
 
@@ -234,4 +297,3 @@ func TestCloudMonitoringClient_ListAvailableMetrics(t *testing.T) {
 		t.Errorf("Expected metric kind GAUGE, got %s", result[0].MetricKind)
 	}
 }
-

@@ -58,6 +58,8 @@ type ListTimeSeriesRequest struct {
 		EndTime   time.Time `json:"end_time"`
 	} `json:"interval"`
 	Aggregation *AggregationConfig `json:"aggregation,omitempty"`
+	PageSize    int                `json:"page_size,omitempty"`
+	PageToken   string             `json:"page_token,omitempty"`
 }
 
 // AggregationConfig represents aggregation configuration for time series queries
@@ -94,11 +96,17 @@ type MetricLabel struct {
 	Description string `json:"description"`
 }
 
+// ListTimeSeriesResponse represents a response with time series data and pagination info
+type ListTimeSeriesResponse struct {
+	TimeSeries    []TimeSeriesData `json:"time_series"`
+	NextPageToken string           `json:"next_page_token,omitempty"`
+}
+
 // MonitoringClient defines the interface for Cloud Monitoring operations
 type MonitoringClient interface {
 	CreateMetricDescriptor(ctx context.Context, req CreateMetricRequest) error
 	WriteTimeSeries(ctx context.Context, req WriteTimeSeriesRequest) error
-	ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) ([]TimeSeriesData, error)
+	ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) (ListTimeSeriesResponse, error)
 	ListMetricDescriptors(ctx context.Context, req ListMetricDescriptorsRequest) (ListMetricDescriptorsResponse, error)
 	DeleteMetricDescriptor(ctx context.Context, metricType string) error
 	ListAvailableMetrics(ctx context.Context, req ListAvailableMetricsRequest) ([]AvailableMetric, error)
@@ -114,7 +122,7 @@ type CloudMonitoringClient struct {
 type MonitoringClientInterface interface {
 	CreateMetricDescriptor(ctx context.Context, req CreateMetricRequest) error
 	WriteTimeSeries(ctx context.Context, req WriteTimeSeriesRequest) error
-	ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) ([]TimeSeriesData, error)
+	ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) (ListTimeSeriesResponse, error)
 	ListMetricDescriptors(ctx context.Context, req ListMetricDescriptorsRequest) (ListMetricDescriptorsResponse, error)
 	DeleteMetricDescriptor(ctx context.Context, metricType string) error
 	ListAvailableMetrics(ctx context.Context, req ListAvailableMetricsRequest) ([]AvailableMetric, error)
@@ -161,7 +169,7 @@ func (c *CloudMonitoringClient) WriteTimeSeries(ctx context.Context, req WriteTi
 }
 
 // ListTimeSeries retrieves time series data from Cloud Monitoring
-func (c *CloudMonitoringClient) ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) ([]TimeSeriesData, error) {
+func (c *CloudMonitoringClient) ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) (ListTimeSeriesResponse, error) {
 	return c.client.ListTimeSeries(ctx, req)
 }
 
@@ -275,7 +283,12 @@ func (r *realMonitoringClient) WriteTimeSeries(ctx context.Context, req WriteTim
 }
 
 // ListTimeSeries implements MonitoringClientInterface for the real client
-func (r *realMonitoringClient) ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) ([]TimeSeriesData, error) {
+func (r *realMonitoringClient) ListTimeSeries(ctx context.Context, req ListTimeSeriesRequest) (ListTimeSeriesResponse, error) {
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 100 // デフォルトのページサイズ
+	}
+
 	pbReq := &monitoringpb.ListTimeSeriesRequest{
 		Name:   fmt.Sprintf("projects/%s", r.projectID),
 		Filter: req.Filter,
@@ -283,6 +296,11 @@ func (r *realMonitoringClient) ListTimeSeries(ctx context.Context, req ListTimeS
 			StartTime: timestamppb.New(req.Interval.StartTime),
 			EndTime:   timestamppb.New(req.Interval.EndTime),
 		},
+		PageSize: int32(pageSize),
+	}
+
+	if req.PageToken != "" {
+		pbReq.PageToken = req.PageToken
 	}
 
 	// Add aggregation if specified
@@ -325,13 +343,14 @@ func (r *realMonitoringClient) ListTimeSeries(ctx context.Context, req ListTimeS
 	it := r.metricClient.ListTimeSeries(ctx, pbReq)
 	var result []TimeSeriesData
 
-	for {
+	// 指定したページサイズまでデータを取得
+	for range pageSize {
 		ts, err := it.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
-			return nil, err
+			return ListTimeSeriesResponse{}, err
 		}
 
 		var values []MetricValue
@@ -364,7 +383,13 @@ func (r *realMonitoringClient) ListTimeSeries(ctx context.Context, req ListTimeS
 		})
 	}
 
-	return result, nil
+	// 次のページトークンを取得
+	nextPageToken := it.PageInfo().Token
+
+	return ListTimeSeriesResponse{
+		TimeSeries:    result,
+		NextPageToken: nextPageToken,
+	}, nil
 }
 
 // ListMetricDescriptorsRequest represents a request to list metric descriptors

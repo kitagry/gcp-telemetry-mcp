@@ -100,10 +100,10 @@ func (mr *MockMonitoringClientMockRecorder) ListMetricDescriptors(ctx, req any) 
 }
 
 // ListTimeSeries mocks base method.
-func (m *MockMonitoringClient) ListTimeSeries(ctx context.Context, req monitoring.ListTimeSeriesRequest) ([]monitoring.TimeSeriesData, error) {
+func (m *MockMonitoringClient) ListTimeSeries(ctx context.Context, req monitoring.ListTimeSeriesRequest) (monitoring.ListTimeSeriesResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListTimeSeries", ctx, req)
-	ret0, _ := ret[0].([]monitoring.TimeSeriesData)
+	ret0, _ := ret[0].(monitoring.ListTimeSeriesResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -211,10 +211,10 @@ func (mr *MockMonitoringClientInterfaceMockRecorder) ListMetricDescriptors(ctx, 
 }
 
 // ListTimeSeries mocks base method.
-func (m *MockMonitoringClientInterface) ListTimeSeries(ctx context.Context, req monitoring.ListTimeSeriesRequest) ([]monitoring.TimeSeriesData, error) {
+func (m *MockMonitoringClientInterface) ListTimeSeries(ctx context.Context, req monitoring.ListTimeSeriesRequest) (monitoring.ListTimeSeriesResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListTimeSeries", ctx, req)
-	ret0, _ := ret[0].([]monitoring.TimeSeriesData)
+	ret0, _ := ret[0].(monitoring.ListTimeSeriesResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

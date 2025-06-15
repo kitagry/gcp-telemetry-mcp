@@ -176,6 +176,12 @@ func main() {
 		mcp.WithObject("aggregation",
 			mcp.Description("Optional aggregation configuration"),
 		),
+		mcp.WithNumber("page_size",
+			mcp.Description("Maximum number of time series to return (default: 100)"),
+		),
+		mcp.WithString("page_token",
+			mcp.Description("Page token for pagination"),
+		),
 	)
 
 	// Add list_metric_descriptors tool
@@ -188,6 +194,12 @@ Otherwise, the [filter](https://cloud.google.com/monitoring/api/v3/filters) spec
 
 metric.type = starts_with("custom.googleapis.com/")
 `),
+		),
+		mcp.WithNumber("page_size",
+			mcp.Description("Maximum number of descriptors to return (default: 100)"),
+		),
+		mcp.WithString("page_token",
+			mcp.Description("Page token for pagination"),
 		),
 	)
 
@@ -610,7 +622,8 @@ func createListTimeSeriesHandler(client monitoring.MonitoringClient) func(contex
 		}
 
 		req := monitoring.ListTimeSeriesRequest{
-			Filter: filter,
+			Filter:   filter,
+			PageSize: 100, // デフォルト値
 		}
 		req.Interval.StartTime = startTime
 		req.Interval.EndTime = endTime
@@ -653,18 +666,42 @@ func createListTimeSeriesHandler(client monitoring.MonitoringClient) func(contex
 			}
 		}
 
-		timeSeries, err := client.ListTimeSeries(ctx, req)
+		// Parse optional page_size parameter
+		if pageSizeArg, exists := args["page_size"]; exists {
+			if pageSize, ok := pageSizeArg.(float64); ok && pageSize > 0 {
+				req.PageSize = int(pageSize)
+			}
+		}
+
+		// Parse optional page_token parameter
+		if pageTokenArg, exists := args["page_token"]; exists {
+			if pageToken, ok := pageTokenArg.(string); ok && pageToken != "" {
+				req.PageToken = pageToken
+			}
+		}
+
+		resp, err := client.ListTimeSeries(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to list time series: %v", err)), nil
 		}
 
-		// Convert time series to JSON for response
-		timeSeriesJSON, err := json.MarshalIndent(timeSeries, "", "  ")
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal time series: %v", err)), nil
+		// Create a response object that includes both time series data and pagination info
+		response := map[string]interface{}{
+			"time_series": resp.TimeSeries,
 		}
 
-		return mcp.NewToolResultText(string(timeSeriesJSON)), nil
+		// Add next_page_token if present
+		if resp.NextPageToken != "" {
+			response["next_page_token"] = resp.NextPageToken
+		}
+
+		// Convert response to JSON
+		responseJSON, err := json.MarshalIndent(response, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal response: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(string(responseJSON)), nil
 	}
 }
 
@@ -672,7 +709,9 @@ func createListTimeSeriesHandler(client monitoring.MonitoringClient) func(contex
 func createListMetricDescriptorsHandler(client monitoring.MonitoringClient) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := request.GetArguments()
-		req := monitoring.ListMetricDescriptorsRequest{}
+		req := monitoring.ListMetricDescriptorsRequest{
+			PageSize: 100, // デフォルト値
+		}
 
 		// Parse optional filter parameter
 		if filterArg, exists := args["filter"]; exists {
@@ -681,14 +720,14 @@ func createListMetricDescriptorsHandler(client monitoring.MonitoringClient) func
 			}
 		}
 
-		// Parse optional page_size parameter (if added in the future)
+		// Parse optional page_size parameter
 		if pageSizeArg, exists := args["page_size"]; exists {
 			if pageSize, ok := pageSizeArg.(float64); ok && pageSize > 0 {
 				req.PageSize = int(pageSize)
 			}
 		}
 
-		// Parse optional page_token parameter (if added in the future)
+		// Parse optional page_token parameter
 		if pageTokenArg, exists := args["page_token"]; exists {
 			if pageToken, ok := pageTokenArg.(string); ok && pageToken != "" {
 				req.PageToken = pageToken
@@ -700,15 +739,23 @@ func createListMetricDescriptorsHandler(client monitoring.MonitoringClient) func
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to list metric descriptors: %v", err)), nil
 		}
 
-		descriptors := resp.Descriptors
-
-		// Convert descriptors to JSON for response
-		descriptorsJSON, err := json.MarshalIndent(descriptors, "", "  ")
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal metric descriptors: %v", err)), nil
+		// Create a response object that includes both descriptors and pagination info
+		response := map[string]interface{}{
+			"descriptors": resp.Descriptors,
 		}
 
-		return mcp.NewToolResultText(string(descriptorsJSON)), nil
+		// Add next_page_token if present
+		if resp.NextPageToken != "" {
+			response["next_page_token"] = resp.NextPageToken
+		}
+
+		// Convert response to JSON
+		responseJSON, err := json.MarshalIndent(response, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal response: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(string(responseJSON)), nil
 	}
 }
 
