@@ -5,6 +5,7 @@ package monitoring
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	monitoring "cloud.google.com/go/monitoring/apiv3/v2"
@@ -258,9 +259,7 @@ func (r *realMonitoringClient) WriteTimeSeries(ctx context.Context, req WriteTim
 
 		// Convert labels to protobuf format
 		metricLabels := make(map[string]string)
-		for k, v := range ts.MetricLabels {
-			metricLabels[k] = v
-		}
+		maps.Copy(metricLabels, ts.MetricLabels)
 
 		timeSeries = append(timeSeries, &monitoringpb.TimeSeries{
 			Metric: &metric.Metric{

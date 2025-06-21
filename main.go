@@ -686,7 +686,7 @@ func createListTimeSeriesHandler(client monitoring.MonitoringClient) func(contex
 		}
 
 		// Create a response object that includes both time series data and pagination info
-		response := map[string]interface{}{
+		response := map[string]any{
 			"time_series": resp.TimeSeries,
 		}
 
@@ -740,7 +740,7 @@ func createListMetricDescriptorsHandler(client monitoring.MonitoringClient) func
 		}
 
 		// Create a response object that includes both descriptors and pagination info
-		response := map[string]interface{}{
+		response := map[string]any{
 			"descriptors": resp.Descriptors,
 		}
 
