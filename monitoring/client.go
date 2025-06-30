@@ -353,7 +353,7 @@ func (r *realMonitoringClient) ListTimeSeries(ctx context.Context, req ListTimeS
 		}
 
 		var values []MetricValue
-		for _, point := range ts.Points {
+		for _, point := range ts.GetPoints() {
 			var value float64
 			switch v := point.Value.Value.(type) {
 			case *monitoringpb.TypedValue_DoubleValue:
@@ -408,7 +408,7 @@ type ListMetricDescriptorsResponse struct {
 func (r *realMonitoringClient) ListMetricDescriptors(ctx context.Context, req ListMetricDescriptorsRequest) (ListMetricDescriptorsResponse, error) {
 	pageSize := req.PageSize
 	if pageSize <= 0 {
-		pageSize = 100 // default page size
+		pageSize = 5 // default page size
 	}
 
 	pbReq := &monitoringpb.ListMetricDescriptorsRequest{

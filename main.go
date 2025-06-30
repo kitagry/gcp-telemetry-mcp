@@ -710,7 +710,7 @@ func createListMetricDescriptorsHandler(client monitoring.MonitoringClient) func
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := request.GetArguments()
 		req := monitoring.ListMetricDescriptorsRequest{
-			PageSize: 100, // デフォルト値
+			PageSize: 5, // デフォルト値
 		}
 
 		// Parse optional filter parameter
