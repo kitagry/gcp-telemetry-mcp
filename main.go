@@ -100,7 +100,23 @@ func main() {
 	listLogsTool := mcp.NewTool("list_log_entries",
 		mcp.WithDescription("List log entries from Cloud Logging"),
 		mcp.WithString("filter",
-			mcp.Description("Cloud Logging filter expression"),
+			mcp.Description(`Filter sets an advanced logs filter for listing log entries (see
+https://cloud.google.com/logging/docs/view/advanced_filters). The filter is compared against all log entries in the projects specified by ProjectIDs. Only entries that match the filter are retrieved. An empty filter (the default) matches all log entries.
+
+In the filter string, log names must be written in their full form, as "projects/PROJECT-ID/logs/LOG-ID". Forward slashes in LOG-ID must be replaced by %2F before calling Filter.
+
+Timestamps in the filter string must be written in RFC 3339 format. By default, timestamp filters for the past 24 hours.
+
+e.x.)
+
+* If you want to filter logs for a specific Kubernetes pod, you can use a filter like this:
+
+resource.type = "k8s_container"
+resource.labels.project_id="YOUR PROJECT ID"
+resource.labels.cluster_name="YOUR CLUSTER NAME"
+resource.labels.namespace_name="YOUR NAMESPACE NAME"
+(labels.k8s-pod/app="YOUR APP LABEL NAME")
+`),
 		),
 		mcp.WithNumber("limit",
 			mcp.Description("Maximum number of entries to return (default: 50)"),
